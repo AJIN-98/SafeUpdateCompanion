@@ -5,9 +5,11 @@ data class DeviceHealth(
     val batteryTemperature: Float,
     val storageFreePercent: Int,
     val isNetworkStable: Boolean,
-    val deviceAgeScore: Int, // 0–100 based on age/performance
+    val deviceAgeScore: Int,
+    val ramUsagePercent: Int = 0,
+    val cpuLoadPercent: Int = 0,
+    val cpuTemperature: Float = 0f
 )
-
 data class UpdateReadiness(
     val score: Int, // 0–100
     val status: String, // "Safe", "Warning", "Risky"

@@ -61,10 +61,19 @@ fun SafeUpdateApp() {
     var deviceHealth by remember { mutableStateOf<DeviceHealth?>(null) }
     var readiness by remember { mutableStateOf<UpdateReadiness?>(null) }
     var checksStarted by remember { mutableStateOf(false) }
-    var checkProgress by remember { mutableStateOf(listOf(false, false, false, false, false)) }
+    var checkProgress by remember { mutableStateOf(listOf(false, false, false, false, false, false, false, false)) }
     var networkSpeed by remember { mutableStateOf("Calculating...") }
 
-    val checkNames = listOf("Battery", "Storage", "Network", "Device Age", "Battery Temp")
+    val checkNames = listOf(
+        "Battery",
+        "Battery Temp",
+        "Storage",
+        "Network",
+        "Device Age",
+        "RAM Usage",
+        "CPU Load",
+        "CPU Temp"
+    )
 
     Scaffold(
         topBar = {
@@ -79,10 +88,9 @@ fun SafeUpdateApp() {
                     )
                 },
                 colors = TopAppBarDefaults.mediumTopAppBarColors(
-                    containerColor = Color(0xFF6C63FF) // purple
+                    containerColor = Color(0xFF6C63FF)
                 )
             )
-
         },
         content = { padding ->
             Column(
@@ -101,11 +109,9 @@ fun SafeUpdateApp() {
                         readiness = deviceHealth?.let { HealthChecker.calculateUpdateReadiness(it) }
 
                         // Measure network speed asynchronously
-                        scope.launch {
-                            networkSpeed = measureNetworkSpeed()
-                        }
+                        scope.launch { networkSpeed = measureNetworkSpeed() }
 
-                        // Animate checks sequentially using coroutine
+                        // Animate checks sequentially
                         scope.launch {
                             for (i in checkProgress.indices) {
                                 delay(500)
@@ -145,7 +151,10 @@ fun SafeUpdateApp() {
                                     "Battery Temp" -> "${dh.batteryTemperature}°C"
                                     "Storage" -> "${dh.storageFreePercent}% free"
                                     "Network" -> networkSpeed
-                                    "Device Age" -> "${dh.deviceAgeScore}/100"
+                                    "Device Age" -> "${dh.deviceAgeScore} Years"
+                                    "RAM Usage" -> "${dh.ramUsagePercent}%"
+                                    "CPU Load" -> "${dh.cpuLoadPercent}%"
+                                    "CPU Temp" -> "${dh.cpuTemperature}°C"
                                     else -> ""
                                 }
                                 Text("${checkNames[i]}: $valueText", fontSize = 16.sp)
@@ -156,7 +165,6 @@ fun SafeUpdateApp() {
 
                 Spacer(modifier = Modifier.height(30.dp))
 
-                // Show final score once all checks complete
                 if (checkProgress.all { it } && readiness != null) {
                     val scoreColor = when (readiness!!.status) {
                         "Safe" -> MaterialTheme.colorScheme.primary
@@ -188,9 +196,10 @@ fun SafeUpdateApp() {
     )
 }
 
+// Updated network speed measurement using a smaller file for reliability
 suspend fun measureNetworkSpeed(): String = withContext(Dispatchers.IO) {
     try {
-        val testUrl = URL("https://speed.hetzner.de/100MB.bin")
+        val testUrl = URL("https://speed.hetzner.de/1MB.bin")
         val connection = testUrl.openConnection() as HttpURLConnection
         connection.connectTimeout = 5000
         connection.readTimeout = 5000
@@ -199,9 +208,9 @@ suspend fun measureNetworkSpeed(): String = withContext(Dispatchers.IO) {
         val startTime = System.currentTimeMillis()
         var downloadedBytes = 0L
         BufferedInputStream(connection.inputStream).use { input ->
-            val buffer = ByteArray(8 * 1024) // 8KB buffer
+            val buffer = ByteArray(8 * 1024)
             var bytesRead: Int
-            while (input.read(buffer).also { bytesRead = it } != -1 && downloadedBytes < 1024 * 500) {
+            while (input.read(buffer).also { bytesRead = it } != -1 && downloadedBytes < 1024 * 1024) {
                 downloadedBytes += bytesRead
             }
         }
@@ -213,3 +222,4 @@ suspend fun measureNetworkSpeed(): String = withContext(Dispatchers.IO) {
         "Unable to measure"
     }
 }
+

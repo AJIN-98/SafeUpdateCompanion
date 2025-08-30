@@ -1,14 +1,17 @@
 package com.example.safeupdatecompanion.utils
 
+import android.app.ActivityManager
 import android.content.Context
 import android.os.BatteryManager
 import android.os.Build
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
-import android.os.StatFs
 import android.os.Environment
+import android.os.StatFs
 import com.example.safeupdatecompanion.model.DeviceHealth
 import com.example.safeupdatecompanion.model.UpdateReadiness
+import java.io.File
+import java.io.RandomAccessFile
 
 object HealthChecker {
 
@@ -18,20 +21,35 @@ object HealthChecker {
         val batteryTemp = getBatteryTemperature(context)
         val storageFreePercent = getStorageFreePercent()
         val networkStable = isNetworkStable(context)
-        val deviceAgeScore = 80 // Placeholder: in real app, calculate from age/performance
+        val deviceAgeScore = calculateDeviceAge()
+        val ramUsagePercent = getRAMUsagePercent(context)
+        val cpuLoadPercent = getCPULoadPercent()
+        val cpuTemperature = getCPUTemperature()
 
         return DeviceHealth(
             batteryLevel,
             batteryTemp,
             storageFreePercent,
             networkStable,
-            deviceAgeScore
+            deviceAgeScore,
+            ramUsagePercent,
+            cpuLoadPercent,
+            cpuTemperature
         )
+    }
+
+    // Device age score: 100 = new, 10 = very old
+    private fun calculateDeviceAge(): Int {
+        val buildTime = Build.TIME
+        val currentTime = System.currentTimeMillis()
+        val ageInYears = ((currentTime - buildTime) / (1000 * 60 * 60 * 24 * 365)).toInt()
+
+        return ageInYears
     }
 
     private fun getBatteryTemperature(context: Context): Float {
         val intent = context.registerReceiver(null, android.content.IntentFilter(android.content.Intent.ACTION_BATTERY_CHANGED))
-        val temp = intent?.getIntExtra(android.os.BatteryManager.EXTRA_TEMPERATURE, 0) ?: 0
+        val temp = intent?.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, 0) ?: 0
         return temp / 10f
     }
 
@@ -49,34 +67,94 @@ object HealthChecker {
         return caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
     }
 
+    private fun getRAMUsagePercent(context: Context): Int {
+        val activityManager = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+        val memoryInfo = ActivityManager.MemoryInfo()
+        activityManager.getMemoryInfo(memoryInfo)
+        val used = memoryInfo.totalMem - memoryInfo.availMem
+        return ((used.toDouble() / memoryInfo.totalMem) * 100).toInt()
+    }
+
+    private fun getCPULoadPercent(): Int {
+        return try {
+            val reader = RandomAccessFile("/proc/stat", "r")
+            val load1 = reader.readLine().split("\\s+".toRegex()).drop(1).map { it.toLong() }
+            val idle1 = load1[3]
+            val total1 = load1.sum()
+            Thread.sleep(360) // 360ms interval
+            reader.seek(0)
+            val load2 = reader.readLine().split("\\s+".toRegex()).drop(1).map { it.toLong() }
+            val idle2 = load2[3]
+            val total2 = load2.sum()
+            reader.close()
+            val cpuUsage = (1.0 - (idle2 - idle1).toDouble() / (total2 - total1)) * 100
+            cpuUsage.coerceIn(0.0, 100.0).toInt()
+        } catch (e: Exception) {
+            0
+        }
+    }
+
+    private fun getCPUTemperature(): Float {
+        return try {
+            val thermalFiles = listOf(
+                "/sys/class/thermal/thermal_zone0/temp",
+                "/sys/class/thermal/thermal_zone1/temp",
+                "/sys/class/thermal/thermal_zone10/temp"
+            )
+            var temp = 0f
+            for (filePath in thermalFiles) {
+                val file = File(filePath)
+                if (file.exists()) {
+                    val value = file.readText().trim().toFloat()
+                    if (value > 0) {
+                        temp = if (value > 1000) value / 1000f else value
+                        break
+                    }
+                }
+            }
+            temp
+        } catch (e: Exception) {
+            0f
+        }
+    }
+
     fun calculateUpdateReadiness(health: DeviceHealth): UpdateReadiness {
         var score = 100
         val suggestions = mutableListOf<String>()
 
-        if (health.batteryLevel < 50) {
-            score -= 30
-            suggestions.add("Charge battery to at least 50%")
+        if (health.batteryLevel < 50) { score -= 30; suggestions.add("Charge battery to at least 50%") }
+        if (health.batteryTemperature > 40f) { score -= 20; suggestions.add("Cool down device before updating") }
+        if (health.storageFreePercent < 20) { score -= 20; suggestions.add("Free up storage space") }
+        if (!health.isNetworkStable) { score -= 20; suggestions.add("Connect to a stable network") }
+
+        // Device age penalties based on actual years
+        when (health.deviceAgeScore) {
+            0, 1 -> {
+                // New device, no penalty
+            }
+            2 -> {
+                score -= 15
+                suggestions.add("Device is 2 years old; minor caution advised")
+            }
+            3 -> {
+                score -= 30
+                suggestions.add("Device is 3 years old; consider updating apps first")
+            }
+            4 -> {
+                score -= 45
+                suggestions.add("Device is 4 years old; update only essential apps")
+            }
+            else -> {
+                score -= 60
+                suggestions.add("Device is 5+ years old; updating may cause issues")
+            }
         }
 
-        if (health.batteryTemperature > 40f) {
-            score -= 20
-            suggestions.add("Cool down device before updating")
-        }
 
-        if (health.storageFreePercent < 20) {
-            score -= 20
-            suggestions.add("Free up storage space")
-        }
-
-        if (!health.isNetworkStable) {
-            score -= 15
-            suggestions.add("Connect to a stable network")
-        }
-
-        if (health.deviceAgeScore < 50) {
-            score -= 15
-            suggestions.add("Device is aged; consider updating apps first")
-        }
+        // RAM/CPU/CPU Temp penalties
+        if (health.ramUsagePercent > 80) { score -= 30; suggestions.add("High RAM usage may slow down update") }
+        if (health.cpuLoadPercent > 80) { score -= 30; suggestions.add("CPU under load; consider closing apps") }
+        if (health.cpuTemperature > 70f) { score -= 30; suggestions.add("CPU is hot; cool down before updating") }
 
         val status = when {
             score >= 80 -> "Safe"
