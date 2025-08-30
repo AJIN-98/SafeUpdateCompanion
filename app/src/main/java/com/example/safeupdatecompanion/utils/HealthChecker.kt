@@ -26,7 +26,7 @@ object HealthChecker {
         val networkStable = isNetworkStable(context)
         val deviceAgeScore = calculateDeviceAge()
         val ramUsagePercent = getRAMUsagePercent(context)
-        val cpuLoadPercent = getCPULoadPercent()
+      //  val cpuLoadPercent = getCPULoadPercent()
         val cpuTemperature = getCPUTemperature(context)
 
         return DeviceHealth(
@@ -36,7 +36,7 @@ object HealthChecker {
             networkStable,
             deviceAgeScore,
             ramUsagePercent,
-            cpuLoadPercent,
+            0,
             cpuTemperature
         )
     }
@@ -144,8 +144,8 @@ object HealthChecker {
         }
 
         if (health.ramUsagePercent > 80) { score -= 30; suggestions.add("High RAM usage may slow down update") }
-        if (health.cpuLoadPercent > 80) { score -= 30; suggestions.add("CPU heavily loaded; consider closing apps") }
-        else if (health.cpuLoadPercent > 50) { score -= 15; suggestions.add("CPU under load; wait before updating") }
+//        if (health.cpuLoadPercent > 80) { score -= 30; suggestions.add("CPU heavily loaded; consider closing apps") }
+//        else if (health.cpuLoadPercent > 50) { score -= 15; suggestions.add("CPU under load; wait before updating") }
 
         if (health.cpuTemperature > 80f) { score -= 30; suggestions.add("CPU is very hot; cool down before updating") }
         else if (health.cpuTemperature > 70f) { score -= 15; suggestions.add("CPU is warm; consider waiting") }

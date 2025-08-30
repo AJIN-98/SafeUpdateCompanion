@@ -152,7 +152,7 @@ fun SafeUpdateApp() {
 
     val checkNames = listOf(
         "Battery", "Battery Temp", "Storage", "Network",
-        "Device Age", "RAM Usage", "CPU Load", "CPU Temp"
+        "Device Age", "RAM Usage", "CPU Temp"
     )
 
     val scrollState = rememberScrollState()
@@ -220,7 +220,7 @@ fun SafeUpdateApp() {
                             "Network" -> networkSpeed
                             "Device Age" -> "${dh.deviceAgeScore} Years"
                             "RAM Usage" -> "${dh.ramUsagePercent}%"
-                            "CPU Load" -> "${dh.cpuLoadPercent}%"
+//                            "CPU Load" -> "${dh.cpuLoadPercent}%"
                             "CPU Temp" -> "${dh.cpuTemperature}°C"
                             else -> ""
                         }
