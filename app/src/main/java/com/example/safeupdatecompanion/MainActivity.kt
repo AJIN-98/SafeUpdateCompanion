@@ -1,25 +1,32 @@
 package com.example.safeupdatecompanion
 
-import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.platform.LocalContext
 import com.example.safeupdatecompanion.model.DeviceHealth
 import com.example.safeupdatecompanion.model.UpdateReadiness
 import com.example.safeupdatecompanion.utils.HealthChecker
+import com.google.accompanist.systemuicontroller.rememberSystemUiController
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -27,9 +34,6 @@ import kotlinx.coroutines.withContext
 import java.io.BufferedInputStream
 import java.net.HttpURLConnection
 import java.net.URL
-import com.google.accompanist.systemuicontroller.rememberSystemUiController
-import androidx.compose.ui.graphics.Color
-import androidx.compose.runtime.SideEffect
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -37,18 +41,42 @@ class MainActivity : ComponentActivity() {
         setContent {
             SafeUpdateApp()
             SetStatusBarColor()
-
         }
     }
 }
+
 @Composable
 fun SetStatusBarColor() {
     val systemUiController = rememberSystemUiController()
     SideEffect {
         systemUiController.setStatusBarColor(
-            color = Color(0xFF6C63FF), // Purple background
-            darkIcons = true // make icons dark
+            color = Color(0xFF6C63FF),
+            darkIcons = false
         )
+    }
+}
+
+@Composable
+fun GradientButton(text: String, onClick: () -> Unit) {
+    Button(
+        onClick = onClick,
+        shape = RoundedCornerShape(30.dp),
+        colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(56.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    brush = Brush.horizontalGradient(listOf(Color(0xFF6C63FF), Color(0xFF3F51B5))),
+                    shape = RoundedCornerShape(30.dp)
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(text, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+        }
     }
 }
 
@@ -61,142 +89,154 @@ fun SafeUpdateApp() {
     var deviceHealth by remember { mutableStateOf<DeviceHealth?>(null) }
     var readiness by remember { mutableStateOf<UpdateReadiness?>(null) }
     var checksStarted by remember { mutableStateOf(false) }
-    var checkProgress by remember { mutableStateOf(listOf(false, false, false, false, false, false, false, false)) }
+    var checkProgress by remember { mutableStateOf(List(8) { false }) }
     var networkSpeed by remember { mutableStateOf("Calculating...") }
 
     val checkNames = listOf(
-        "Battery",
-        "Battery Temp",
-        "Storage",
-        "Network",
-        "Device Age",
-        "RAM Usage",
-        "CPU Load",
-        "CPU Temp"
+        "Battery", "Battery Temp", "Storage", "Network",
+        "Device Age", "RAM Usage", "CPU Load", "CPU Temp"
     )
+
+    val scrollState = rememberScrollState()
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                modifier = Modifier.fillMaxWidth(),
+            CenterAlignedTopAppBar(
                 title = {
                     Text(
                         "Safe Update Companion",
-                        fontSize = 22.sp,
+                        color = Color.White,
                         fontWeight = FontWeight.Bold,
-                        color = Color.White
+                        fontSize = 20.sp
                     )
                 },
-                colors = TopAppBarDefaults.mediumTopAppBarColors(
+                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
                     containerColor = Color(0xFF6C63FF)
                 )
             )
-        },
-        content = { padding ->
-            Column(
-                modifier = Modifier
-                    .padding(padding)
-                    .padding(16.dp)
-                    .fillMaxSize(),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Spacer(modifier = Modifier.height(20.dp))
+        }
+    ) { padding ->
 
-                Button(
-                    onClick = {
-                        checksStarted = true
-                        deviceHealth = HealthChecker.getDeviceHealth(context)
-                        readiness = deviceHealth?.let { HealthChecker.calculateUpdateReadiness(it) }
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .verticalScroll(scrollState)
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Spacer(Modifier.height(16.dp))
 
-                        // Measure network speed asynchronously
-                        scope.launch { networkSpeed = measureNetworkSpeed() }
+            GradientButton("Check Status") {
+                checksStarted = true
+                deviceHealth = HealthChecker.getDeviceHealth(context)
+                readiness = deviceHealth?.let { HealthChecker.calculateUpdateReadiness(it) }
 
-                        // Animate checks sequentially
-                        scope.launch {
-                            for (i in checkProgress.indices) {
-                                delay(500)
-                                checkProgress = checkProgress.mapIndexed { index, _ -> index <= i }
-                            }
-                        }
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6C63FF)),
-                    shape = RoundedCornerShape(24.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp)
-                ) {
-                    Text("Check Status", color = Color.White, fontSize = 18.sp)
+                scope.launch { networkSpeed = measureNetworkSpeed() }
+
+                scope.launch {
+                    for (i in checkProgress.indices) {
+                        delay(500)
+                        checkProgress = checkProgress.mapIndexed { index, _ -> index <= i }
+                    }
                 }
+            }
 
-                Spacer(modifier = Modifier.height(30.dp))
+            Spacer(Modifier.height(20.dp))
 
-                if (checksStarted && deviceHealth != null) {
-                    val dh = deviceHealth!!
-                    LazyColumn(modifier = Modifier.fillMaxWidth()) {
-                        items(checkNames.size) { i ->
+            AnimatedVisibility(visible = checksStarted && deviceHealth != null) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    checkNames.forEachIndexed { i, name ->
+                        val dh = deviceHealth!!
+                        val valueText = when (name) {
+                            "Battery" -> "${dh.batteryLevel}%"
+                            "Battery Temp" -> "${dh.batteryTemperature}°C"
+                            "Storage" -> "${dh.storageFreePercent}% free"
+                            "Network" -> networkSpeed
+                            "Device Age" -> "${dh.deviceAgeScore} Years"
+                            "RAM Usage" -> "${dh.ramUsagePercent}%"
+                            "CPU Load" -> "${dh.cpuLoadPercent}%"
+                            "CPU Temp" -> "${dh.cpuTemperature}°C"
+                            else -> ""
+                        }
+
+                        Card(
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (checkProgress[i]) Color(0xFFE8F5E9) else Color(0xFFF5F5F5)
+                            ),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                        ) {
                             Row(
-                                verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 8.dp)
-                                    .animateContentSize(animationSpec = tween(500))
+                                    .padding(16.dp)
+                                    .animateContentSize(tween(500)),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Checkbox(
-                                    checked = checkProgress.getOrElse(i) { false },
-                                    onCheckedChange = null
-                                )
-                                Spacer(modifier = Modifier.width(12.dp))
-                                val valueText = when (checkNames[i]) {
-                                    "Battery" -> "${dh.batteryLevel}%"
-                                    "Battery Temp" -> "${dh.batteryTemperature}°C"
-                                    "Storage" -> "${dh.storageFreePercent}% free"
-                                    "Network" -> networkSpeed
-                                    "Device Age" -> "${dh.deviceAgeScore} Years"
-                                    "RAM Usage" -> "${dh.ramUsagePercent}%"
-                                    "CPU Load" -> "${dh.cpuLoadPercent}%"
-                                    "CPU Temp" -> "${dh.cpuTemperature}°C"
-                                    else -> ""
+                                if (checkProgress[i]) {
+                                    Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color(0xFF4CAF50))
+                                } else {
+                                    CircularProgressIndicator(strokeWidth = 3.dp, modifier = Modifier.size(24.dp))
                                 }
-                                Text("${checkNames[i]}: $valueText", fontSize = 16.sp)
+                                Spacer(Modifier.width(12.dp))
+                                Column {
+                                    Text(name, style = MaterialTheme.typography.titleMedium)
+                                    Text(valueText, style = MaterialTheme.typography.bodyMedium, color = Color.Gray)
+                                }
                             }
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(30.dp))
-
-                if (checkProgress.all { it } && readiness != null) {
-                    val scoreColor = when (readiness!!.status) {
-                        "Safe" -> MaterialTheme.colorScheme.primary
-                        "Warning" -> MaterialTheme.colorScheme.secondary
-                        else -> MaterialTheme.colorScheme.error
-                    }
-
-                    Text(
-                        "Update Readiness Score: ${readiness!!.score}",
-                        style = MaterialTheme.typography.titleLarge,
-                        color = scoreColor,
-                        modifier = Modifier.padding(bottom = 8.dp)
-                    )
-                    Text(
-                        "Status: ${readiness!!.status}",
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.padding(bottom = 16.dp)
-                    )
-
-                    if (readiness!!.suggestions.isNotEmpty()) {
-                        Text("Suggestions:", style = MaterialTheme.typography.titleMedium)
-                        readiness!!.suggestions.forEach { suggestion ->
-                            Text("- $suggestion")
                         }
                     }
                 }
             }
+
+            Spacer(Modifier.height(20.dp))
+
+            if (checkProgress.all { it } && readiness != null) {
+                val scoreColor = when (readiness!!.status) {
+                    "Safe" -> Color(0xFF4CAF50)
+                    "Warning" -> Color(0xFFFFA000)
+                    else -> Color(0xFFD32F2F)
+                }
+
+                Card(
+                    shape = RoundedCornerShape(24.dp),
+                    elevation = CardDefaults.cardElevation(6.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Box(contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator(
+                                progress = readiness!!.score / 100f,
+                                strokeWidth = 10.dp,
+                                color = scoreColor,
+                                modifier = Modifier.size(120.dp)
+                            )
+                            Text("${readiness!!.score}", style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold, color = scoreColor))
+                        }
+
+                        Spacer(Modifier.height(12.dp))
+                        Text("Total Score: ${readiness!!.score} / 100", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Medium))
+                        Spacer(Modifier.height(8.dp))
+                        Text("Status: ${readiness!!.status}", style = MaterialTheme.typography.titleLarge, color = scoreColor)
+
+                        if (readiness!!.suggestions.isNotEmpty()) {
+                            Spacer(Modifier.height(12.dp))
+                            Text("Suggestions:", style = MaterialTheme.typography.titleMedium)
+                            readiness!!.suggestions.forEach { suggestion ->
+                                Text("• $suggestion", style = MaterialTheme.typography.bodyMedium)
+                            }
+                        }
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(16.dp))
         }
-    )
+    }
 }
 
-// Updated network speed measurement using a smaller file for reliability
+// Network speed measurement
 suspend fun measureNetworkSpeed(): String = withContext(Dispatchers.IO) {
     try {
         val testUrl = URL("https://nbg1-speed.hetzner.com/100MB.bin")
@@ -222,4 +262,3 @@ suspend fun measureNetworkSpeed(): String = withContext(Dispatchers.IO) {
         "Unable to measure"
     }
 }
-
