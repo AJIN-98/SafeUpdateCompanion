@@ -5,7 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -19,6 +19,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -57,7 +58,22 @@ fun SetStatusBarColor() {
 }
 
 @Composable
-fun GradientButton(text: String, onClick: () -> Unit) {
+fun PulsingGradientButton(
+    text: String,
+    isChecking: Boolean,
+    onClick: () -> Unit
+) {
+    val infiniteTransition = rememberInfiniteTransition()
+    val scale by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = 1.08f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(700, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        )
+    )
+    val currentScale = if (isChecking) scale else 1f
+
     Button(
         onClick = onClick,
         shape = RoundedCornerShape(30.dp),
@@ -65,6 +81,10 @@ fun GradientButton(text: String, onClick: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .height(56.dp)
+            .graphicsLayer {
+                scaleX = currentScale
+                scaleY = currentScale
+            }
     ) {
         Box(
             modifier = Modifier
@@ -75,7 +95,19 @@ fun GradientButton(text: String, onClick: () -> Unit) {
                 ),
             contentAlignment = Alignment.Center
         ) {
-            Text(text, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            if (isChecking) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    CircularProgressIndicator(
+                        color = Color.White,
+                        strokeWidth = 3.dp,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(text, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                }
+            } else {
+                Text(text, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            }
         }
     }
 }
@@ -99,6 +131,11 @@ fun SafeUpdateApp() {
 
     val scrollState = rememberScrollState()
 
+    // Scroll to bottom when checkProgress updates
+    LaunchedEffect(checkProgress) {
+        scrollState.animateScrollTo(scrollState.maxValue)
+    }
+
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
@@ -111,7 +148,7 @@ fun SafeUpdateApp() {
                     )
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = Color(0xFF6C63FF)
+                    containerColor = Color(0xFF009688)
                 )
             )
         }
@@ -127,7 +164,10 @@ fun SafeUpdateApp() {
         ) {
             Spacer(Modifier.height(16.dp))
 
-            GradientButton("Check Status") {
+            PulsingGradientButton(
+                text = "Check Status",
+                isChecking = checksStarted && checkProgress.any { !it }
+            ) {
                 checksStarted = true
                 deviceHealth = HealthChecker.getDeviceHealth(context)
                 readiness = deviceHealth?.let { HealthChecker.calculateUpdateReadiness(it) }
@@ -165,8 +205,7 @@ fun SafeUpdateApp() {
                             colors = CardDefaults.cardColors(
                                 containerColor = if (checkProgress[i]) Color(0xFFE8F5E9) else Color(0xFFF5F5F5)
                             ),
-                            modifier = Modifier
-                                .fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth()
                         ) {
                             Row(
                                 modifier = Modifier
