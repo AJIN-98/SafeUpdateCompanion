@@ -1,6 +1,7 @@
 # Safe Update Companion
 
-![App Screenshot](images/image.jpeg)  
+![Safe Update Companion](https://github.com/AJIN-98/SafeUpdateCompanion/blob/main/image/image.jpeg)
+
 *Figure:  Safe Update Companion in action*
 
 ** Safe Update Companion** is an Android utility designed to help users determine whether their device is ready for system or application updates. By evaluating multiple device health metrics, it provides a readiness score, status, and actionable suggestions to ensure updates are performed safely, minimizing risks like crashes, overheating, or slow performance.
