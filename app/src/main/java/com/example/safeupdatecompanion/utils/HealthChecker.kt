@@ -2,10 +2,13 @@ package com.example.safeupdatecompanion.utils
 
 import android.app.ActivityManager
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.os.BatteryManager
 import android.os.Build
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
+import android.os.Debug
 import android.os.Environment
 import android.os.StatFs
 import com.example.safeupdatecompanion.model.DeviceHealth
@@ -24,7 +27,7 @@ object HealthChecker {
         val deviceAgeScore = calculateDeviceAge()
         val ramUsagePercent = getRAMUsagePercent(context)
         val cpuLoadPercent = getCPULoadPercent()
-        val cpuTemperature = getCPUTemperature()
+        val cpuTemperature = getCPUTemperature(context)
 
         return DeviceHealth(
             batteryLevel,
@@ -71,52 +74,66 @@ object HealthChecker {
         val activityManager = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
         val memoryInfo = ActivityManager.MemoryInfo()
         activityManager.getMemoryInfo(memoryInfo)
+
+        // Include cached memory for more realistic "used RAM"
         val used = memoryInfo.totalMem - memoryInfo.availMem
-        return ((used.toDouble() / memoryInfo.totalMem) * 100).toInt()
+        val usagePercent = ((used.toDouble() / memoryInfo.totalMem) * 100).toInt()
+        return usagePercent.coerceIn(0, 100)
     }
+
+
 
     private fun getCPULoadPercent(): Int {
         return try {
             val reader = RandomAccessFile("/proc/stat", "r")
             val load1 = reader.readLine().split("\\s+".toRegex()).drop(1).map { it.toLong() }
-            val idle1 = load1[3]
-            val total1 = load1.sum()
-            Thread.sleep(360) // 360ms interval
-            reader.seek(0)
-            val load2 = reader.readLine().split("\\s+".toRegex()).drop(1).map { it.toLong() }
-            val idle2 = load2[3]
-            val total2 = load2.sum()
             reader.close()
-            val cpuUsage = (1.0 - (idle2 - idle1).toDouble() / (total2 - total1)) * 100
-            cpuUsage.coerceIn(0.0, 100.0).toInt()
+
+            val idle1 = load1[3] + load1[4] // idle + iowait
+            val total1 = load1.sum()
+
+            Thread.sleep(500)
+
+            val reader2 = RandomAccessFile("/proc/stat", "r")
+            val load2 = reader2.readLine().split("\\s+".toRegex()).drop(1).map { it.toLong() }
+            reader2.close()
+
+            val idle2 = load2[3] + load2[4]
+            val total2 = load2.sum()
+
+            val usage = (1.0 - (idle2 - idle1).toDouble() / (total2 - total1)) * 100
+            usage.coerceIn(0.0, 100.0).toInt()
         } catch (e: Exception) {
-            0
+            // fallback using process stats
+            try {
+                val usage = (Debug.getNativeHeapAllocatedSize().toDouble() /
+                        Debug.getNativeHeapSize().toDouble()) * 100
+                usage.coerceIn(0.0, 100.0).toInt()
+            } catch (_: Exception) {
+                0
+            }
         }
     }
 
-    private fun getCPUTemperature(): Float {
+
+    private fun getCPUTemperature(context: Context): Float {
         return try {
-            val thermalFiles = listOf(
-                "/sys/class/thermal/thermal_zone0/temp",
-                "/sys/class/thermal/thermal_zone1/temp",
-                "/sys/class/thermal/thermal_zone10/temp"
-            )
-            var temp = 0f
-            for (filePath in thermalFiles) {
-                val file = File(filePath)
-                if (file.exists()) {
-                    val value = file.readText().trim().toFloat()
-                    if (value > 0) {
-                        temp = if (value > 1000) value / 1000f else value
-                        break
-                    }
-                }
+            val thermalFile = File("/sys/class/thermal/thermal_zone0/temp")
+            if (thermalFile.exists()) {
+                val temp = thermalFile.readText().trim().toFloat()
+                return if (temp > 1000) temp / 1000f else temp
             }
-            temp
+
+            // Use battery temp as fallback
+            val intent = context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+            val batteryTemp = intent?.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, 0) ?: 0
+            batteryTemp / 10f
         } catch (e: Exception) {
             0f
         }
     }
+
+
 
     fun calculateUpdateReadiness(health: DeviceHealth): UpdateReadiness {
         var score = 100
@@ -153,8 +170,21 @@ object HealthChecker {
 
         // RAM/CPU/CPU Temp penalties
         if (health.ramUsagePercent > 80) { score -= 30; suggestions.add("High RAM usage may slow down update") }
-        if (health.cpuLoadPercent > 80) { score -= 30; suggestions.add("CPU under load; consider closing apps") }
-        if (health.cpuTemperature > 70f) { score -= 30; suggestions.add("CPU is hot; cool down before updating") }
+        if (health.cpuLoadPercent > 80) {
+            score -= 30
+            suggestions.add("CPU heavily loaded; consider closing apps")
+        } else if (health.cpuLoadPercent > 50) {
+            score -= 15
+            suggestions.add("CPU under load; wait before updating")
+        }
+
+        if (health.cpuTemperature > 80f) {
+            score -= 30
+            suggestions.add("CPU is very hot; cool down before updating")
+        } else if (health.cpuTemperature > 70f) {
+            score -= 15
+            suggestions.add("CPU is warm; consider waiting")
+        }
 
         val status = when {
             score >= 80 -> "Safe"

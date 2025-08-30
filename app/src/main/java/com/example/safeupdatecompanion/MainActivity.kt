@@ -199,7 +199,7 @@ fun SafeUpdateApp() {
 // Updated network speed measurement using a smaller file for reliability
 suspend fun measureNetworkSpeed(): String = withContext(Dispatchers.IO) {
     try {
-        val testUrl = URL("https://speed.hetzner.de/1MB.bin")
+        val testUrl = URL("https://nbg1-speed.hetzner.com/100MB.bin")
         val connection = testUrl.openConnection() as HttpURLConnection
         connection.connectTimeout = 5000
         connection.readTimeout = 5000
