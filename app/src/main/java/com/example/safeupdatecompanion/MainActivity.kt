@@ -16,6 +16,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -64,11 +65,11 @@ fun SetStatusBarColor() {
 @Composable
 fun CircularPulsingButton(
     isChecking: Boolean,
+    allChecksFinished: Boolean,
     onClick: () -> Unit
 ) {
     val infiniteTransition = rememberInfiniteTransition()
 
-    // Pulsing scale animation
     val scale by infiniteTransition.animateFloat(
         initialValue = 1f,
         targetValue = 1.15f,
@@ -78,7 +79,6 @@ fun CircularPulsingButton(
         )
     )
 
-    // Glow alpha animation
     val glowAlpha by infiniteTransition.animateFloat(
         initialValue = 0.3f,
         targetValue = 0.6f,
@@ -110,19 +110,30 @@ fun CircularPulsingButton(
             )
             .clickable { onClick() }
     ) {
-        if (isChecking) {
-            CircularProgressIndicator(
-                color = Color.White,
-                strokeWidth = 5.dp,
-                modifier = Modifier.size(50.dp)
-            )
-        } else {
-            Icon(
-                imageVector = Icons.Default.PlayArrow,
-                contentDescription = "Start",
-                tint = Color.White,
-                modifier = Modifier.size(70.dp)
-            )
+        when {
+            isChecking -> {
+                CircularProgressIndicator(
+                    color = Color.White,
+                    strokeWidth = 5.dp,
+                    modifier = Modifier.size(50.dp)
+                )
+            }
+            allChecksFinished -> {
+                Icon(
+                    imageVector = Icons.Default.Refresh,
+                    contentDescription = "Refresh",
+                    tint = Color.White,
+                    modifier = Modifier.size(70.dp)
+                )
+            }
+            else -> {
+                Icon(
+                    imageVector = Icons.Default.PlayArrow,
+                    contentDescription = "Start",
+                    tint = Color.White,
+                    modifier = Modifier.size(70.dp)
+                )
+            }
         }
     }
 }
@@ -179,7 +190,8 @@ fun SafeUpdateApp() {
             Spacer(Modifier.height(16.dp))
 
             CircularPulsingButton(
-                isChecking = checksStarted && checkProgress.any { !it }
+                isChecking = checksStarted && checkProgress.any { !it },
+                allChecksFinished = checkProgress.all { it } && readiness != null
             ) {
                 checksStarted = true
                 deviceHealth = HealthChecker.getDeviceHealth(context)
