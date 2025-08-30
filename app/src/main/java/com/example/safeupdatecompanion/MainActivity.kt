@@ -7,16 +7,21 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -58,56 +63,65 @@ fun SetStatusBarColor() {
 }
 
 @Composable
-fun PulsingGradientButton(
-    text: String,
+fun CircularPulsingButton(
     isChecking: Boolean,
     onClick: () -> Unit
 ) {
     val infiniteTransition = rememberInfiniteTransition()
+
     val scale by infiniteTransition.animateFloat(
         initialValue = 1f,
-        targetValue = 1.08f,
+        targetValue = 1.15f,
         animationSpec = infiniteRepeatable(
-            animation = tween(700, easing = FastOutSlowInEasing),
+            animation = tween(800, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         )
     )
-    val currentScale = if (isChecking) scale else 1f
 
-    Button(
-        onClick = onClick,
-        shape = RoundedCornerShape(30.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
+    val alpha by infiniteTransition.animateFloat(
+        initialValue = 0.6f,
+        targetValue = 0.9f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(800, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        )
+    )
+
+    Box(
+        contentAlignment = Alignment.Center,
         modifier = Modifier
-            .fillMaxWidth()
-            .height(56.dp)
+            .size(150.dp)
             .graphicsLayer {
-                scaleX = currentScale
-                scaleY = currentScale
+                scaleX = if (isChecking) scale else 1f
+                scaleY = if (isChecking) scale else 1f
             }
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    brush = Brush.horizontalGradient(listOf(Color(0xFF6C63FF), Color(0xFF3F51B5))),
-                    shape = RoundedCornerShape(30.dp)
+            .background(
+                brush = Brush.verticalGradient(
+                    colors = listOf(Color(0xFF6C63FF), Color(0xFF3F51B5))
                 ),
-            contentAlignment = Alignment.Center
-        ) {
-            if (isChecking) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    CircularProgressIndicator(
-                        color = Color.White,
-                        strokeWidth = 3.dp,
-                        modifier = Modifier.size(24.dp)
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text(text, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                }
-            } else {
-                Text(text, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-            }
+                shape = CircleShape
+            )
+            .shadow(
+                elevation = 12.dp,
+                shape = CircleShape,
+                ambientColor = Color(0xFF6C63FF).copy(alpha = alpha),
+                spotColor = Color(0xFF3F51B5).copy(alpha = alpha)
+            )
+            .clickable { onClick() }
+    ) {
+        if (isChecking) {
+            CircularProgressIndicator(
+                color = Color.White,
+                strokeWidth = 5.dp,
+                modifier = Modifier.size(50.dp)
+            )
+        } else {
+            Icon(
+                imageVector = Icons.Default.PlayArrow,
+                contentDescription = "Start",
+                tint = Color.White,
+                modifier = Modifier.size(70.dp)
+            )
         }
     }
 }
@@ -131,7 +145,6 @@ fun SafeUpdateApp() {
 
     val scrollState = rememberScrollState()
 
-    // Scroll to bottom when checkProgress updates
     LaunchedEffect(checkProgress) {
         scrollState.animateScrollTo(scrollState.maxValue)
     }
@@ -164,8 +177,7 @@ fun SafeUpdateApp() {
         ) {
             Spacer(Modifier.height(16.dp))
 
-            PulsingGradientButton(
-                text = "Check Status",
+            CircularPulsingButton(
                 isChecking = checksStarted && checkProgress.any { !it }
             ) {
                 checksStarted = true
@@ -275,7 +287,6 @@ fun SafeUpdateApp() {
     }
 }
 
-// Network speed measurement
 suspend fun measureNetworkSpeed(): String = withContext(Dispatchers.IO) {
     try {
         val testUrl = URL("https://nbg1-speed.hetzner.com/100MB.bin")
