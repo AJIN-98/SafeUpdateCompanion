@@ -16,7 +16,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -69,20 +68,22 @@ fun CircularPulsingButton(
 ) {
     val infiniteTransition = rememberInfiniteTransition()
 
+    // Pulsing scale animation
     val scale by infiniteTransition.animateFloat(
         initialValue = 1f,
         targetValue = 1.15f,
         animationSpec = infiniteRepeatable(
-            animation = tween(800, easing = FastOutSlowInEasing),
+            animation = tween(1000, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         )
     )
 
-    val alpha by infiniteTransition.animateFloat(
-        initialValue = 0.6f,
-        targetValue = 0.9f,
+    // Glow alpha animation
+    val glowAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.3f,
+        targetValue = 0.6f,
         animationSpec = infiniteRepeatable(
-            animation = tween(800, easing = FastOutSlowInEasing),
+            animation = tween(1000, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         )
     )
@@ -90,10 +91,10 @@ fun CircularPulsingButton(
     Box(
         contentAlignment = Alignment.Center,
         modifier = Modifier
-            .size(150.dp)
+            .size(120.dp)
             .graphicsLayer {
-                scaleX = if (isChecking) scale else 1f
-                scaleY = if (isChecking) scale else 1f
+                scaleX = scale
+                scaleY = scale
             }
             .background(
                 brush = Brush.verticalGradient(
@@ -102,10 +103,10 @@ fun CircularPulsingButton(
                 shape = CircleShape
             )
             .shadow(
-                elevation = 12.dp,
+                elevation = 20.dp,
                 shape = CircleShape,
-                ambientColor = Color(0xFF6C63FF).copy(alpha = alpha),
-                spotColor = Color(0xFF3F51B5).copy(alpha = alpha)
+                ambientColor = Color(0xFF6C63FF).copy(alpha = glowAlpha),
+                spotColor = Color(0xFF3F51B5).copy(alpha = glowAlpha)
             )
             .clickable { onClick() }
     ) {
