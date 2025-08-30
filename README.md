@@ -1,6 +1,6 @@
 # Safe Update Companion
 
-![Safe Update Companion](https://github.com/AJIN-98/SafeUpdateCompanion/blob/main/image/image.jpeg)
+<img src="https://github.com/AJIN-98/SafeUpdateCompanion/blob/main/image/image.jpeg" alt="Safe Update Companion" width="300"/>
 
 *Figure:  Safe Update Companion in action*
 
