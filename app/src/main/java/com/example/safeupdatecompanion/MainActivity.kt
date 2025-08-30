@@ -27,13 +27,28 @@ import kotlinx.coroutines.withContext
 import java.io.BufferedInputStream
 import java.net.HttpURLConnection
 import java.net.URL
+import com.google.accompanist.systemuicontroller.rememberSystemUiController
+import androidx.compose.ui.graphics.Color
+import androidx.compose.runtime.SideEffect
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
             SafeUpdateApp()
+            SetStatusBarColor()
+
         }
+    }
+}
+@Composable
+fun SetStatusBarColor() {
+    val systemUiController = rememberSystemUiController()
+    SideEffect {
+        systemUiController.setStatusBarColor(
+            color = Color(0xFF6C63FF), // Purple background
+            darkIcons = true // make icons dark
+        )
     }
 }
 
@@ -54,17 +69,20 @@ fun SafeUpdateApp() {
     Scaffold(
         topBar = {
             TopAppBar(
+                modifier = Modifier.fillMaxWidth(),
                 title = {
-                    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                        Text(
-                            "Safe Update Companion",
-                            fontSize = 22.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onPrimary
-                        )
-                    }
-                }
+                    Text(
+                        "Safe Update Companion",
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                },
+                colors = TopAppBarDefaults.mediumTopAppBarColors(
+                    containerColor = Color(0xFF6C63FF) // purple
+                )
             )
+
         },
         content = { padding ->
             Column(
@@ -95,10 +113,13 @@ fun SafeUpdateApp() {
                             }
                         }
                     },
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.height(56.dp)
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6C63FF)),
+                    shape = RoundedCornerShape(24.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp)
                 ) {
-                    Text("Check Status", fontSize = 18.sp)
+                    Text("Check Status", color = Color.White, fontSize = 18.sp)
                 }
 
                 Spacer(modifier = Modifier.height(30.dp))
