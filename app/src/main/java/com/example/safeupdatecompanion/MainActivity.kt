@@ -166,7 +166,7 @@ fun SafeUpdateApp() {
             CenterAlignedTopAppBar(
                 title = {
                     Text(
-                        "Safe Update Companion",
+                        "Safe Update Companion (Beta)",
                         color = Color.White,
                         fontWeight = FontWeight.Bold,
                         fontSize = 20.sp
